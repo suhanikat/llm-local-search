@@ -88,3 +88,83 @@ src/
 - [ ] Full document chunking with better boundary detection  
 - [ ] VS Code extension UI
 - [ ] Support for more file types
+
+
+## How It Works
+
+### Indexing Sequence
+```mermaid
+sequenceDiagram
+    participant M as main.cpp
+    participant FS as FileScanner
+    participant ME as MetadataExtractor
+    participant TC as TypeClassifier
+    participant CE as ContentExtractor
+    participant CH as Chunker
+    participant EM as Embedder
+    participant VS as VectorStore
+
+    M->>FS: scan(folderPath)
+    FS-->>M: [file1, file2, ...fileN]
+
+    loop For every file
+        M->>ME: extract(filePath)
+        ME-->>M: {size, extension, modified}
+
+        M->>TC: classify(extension)
+        TC-->>M: FileType + isLLMReadable
+
+        alt is LLM readable
+            M->>CE: extract(filePath, extension)
+            CE-->>M: {text, success}
+
+            M->>CH: chunk(text, filePath)
+            CH-->>M: [chunk0, chunk1, ...chunkN]
+
+            loop For every chunk
+                M->>EM: embed(chunk.text)
+                EM-->>M: {embedding[768], success}
+                M->>VS: addEntry(path, text, embedding)
+            end
+        end
+    end
+
+    M->>VS: saveToDisk()
+    VS-->>M: vectors.db saved
+```
+
+### Search Sequence
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant M as main.cpp
+    participant O as Orchestrator
+    participant QA as QueryAgent
+    participant SA as SearchAgent
+    participant RA as RankingAgent
+    participant EM as Embedder
+    participant VS as VectorStore
+
+    U->>M: "find resume with android"
+    M->>O: search(query)
+
+    O->>QA: analyze(query)
+    QA-->>O: {type: DOCUMENT, keywords: [resume, android]}
+
+    O->>SA: search(intent)
+    SA->>EM: embed(query)
+    EM-->>SA: queryVector[768]
+
+    SA->>VS: search(queryVector, topK*3)
+    VS-->>SA: allResults (cosine similarity)
+
+    SA->>SA: filter by DOCUMENT type only
+    SA-->>O: filteredResults
+
+    O->>RA: rank(results, intent)
+    RA->>RA: boost files with keywords in filename
+    RA-->>O: rankedResults
+
+    O-->>M: top 5 results
+    M-->>U: display results
+```
