@@ -8,6 +8,7 @@
 #include "storage/vector_store.h"
 #include "indexing/chunker.h"
 #include "agents/orchestrator.h"
+#include "agents/image_agent.h"
 
 // ─────────────────────────────────────────
 // INDEX MODE
@@ -19,8 +20,9 @@ void indexFolder(const std::string& folderPath) {
     MetadataExtractor metaExtractor;
     TypeClassifier classifier;
     ContentExtractor contentExtractor;
-    Chunker chunker(500, 100);      // 500 char chunks, 100 char overlap
+    Chunker chunker(500, 100);
     Embedder embedder;
+    ImageAgent imageAgent;
     VectorStore store("vectors.db");
 
     auto files = scanner.scan();
@@ -33,20 +35,43 @@ void indexFolder(const std::string& folderPath) {
         if (type == FileType::BUILD_ARTIFACT || type == FileType::UNKNOWN) continue;
         if (!classifier.isLLMReadable(type)) continue;
 
+        // ─────────────────────────────────────────
+        // IMAGE FILES — describe with LLaVA
+        // then embed the description
+        // ─────────────────────────────────────────
+        if (type == FileType::IMAGE) {
+            std::cout << "Describing image: " << meta.path << "\n";
+
+            ImageDescription desc = imageAgent.describe(file);
+            if (desc.success) {
+                std::cout << "  Description: " << desc.description.substr(0, 100) << "...\n";
+
+                // Embed the description not the image
+                EmbeddingResult result = embedder.embed(desc.description);
+                if (result.success) {
+                    store.addEntry(meta.path, desc.description, result.embedding, 0);
+                    std::cout << "  ✓ image indexed\n";
+                }
+            } else {
+                std::cout << "  ✗ failed: " << desc.error << "\n";
+            }
+            continue;
+        }
+
+        // ─────────────────────────────────────────
+        // TEXT FILES — extract, chunk, embed as before
+        // ─────────────────────────────────────────
         FileContent content = contentExtractor.extract(file, meta.extension);
         if (!content.success) continue;
 
-        // Split full file into chunks
         auto chunks = chunker.chunk(content.text, file);
-
         std::cout << "Indexing: " << meta.path 
                   << " (" << chunks.size() << " chunks)\n";
 
-        // Embed every chunk separately
         for (const auto& chunk : chunks) {
             EmbeddingResult result = embedder.embed(chunk.text);
             if (result.success) {
-                store.addEntry(meta.path, chunk.text, 
+                store.addEntry(meta.path, chunk.text,
                                result.embedding, chunk.chunkIndex);
             }
         }

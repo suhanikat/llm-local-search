@@ -18,9 +18,14 @@ add_executable(indexer
     src/indexing/metadata_extractor.cpp
     src/indexing/type_classifier.cpp
     src/indexing/content_extractor.cpp
+    src/indexing/chunker.cpp
     src/embedding/embedder.cpp
     src/storage/vector_store.cpp
-    src/indexing/chunker.cpp
+    src/agents/query_agent.cpp
+    src/agents/search_agent.cpp
+    src/agents/ranking_agent.cpp
+    src/agents/orchestrator.cpp
+    src/agents/image_agent.cpp
 )
 
 target_include_directories(indexer PRIVATE

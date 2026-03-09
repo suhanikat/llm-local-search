@@ -82,5 +82,7 @@ std::string TypeClassifier::typeToString(FileType type) {
 bool TypeClassifier::isLLMReadable(FileType type) {
     // Only documents and code are worth sending to the LLM
     // Everything else gets filtered out
-    return type == FileType::DOCUMENT || type == FileType::CODE;
-}
+ return type == FileType::DOCUMENT || 
+           type == FileType::CODE || 
+           type == FileType::IMAGE;
+ }
