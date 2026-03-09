@@ -1,0 +1,11 @@
+# Build files
+build/
+
+# Vector database — too large for github
+vectors.db
+
+# Mac system files
+.DS_Store
+
+# VSCode
+.vscode/
