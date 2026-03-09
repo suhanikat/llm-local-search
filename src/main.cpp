@@ -7,6 +7,7 @@
 #include "embedding/embedder.h"
 #include "storage/vector_store.h"
 #include "indexing/chunker.h"
+#include "agents/orchestrator.h"
 
 // ─────────────────────────────────────────
 // INDEX MODE
@@ -61,59 +62,41 @@ void indexFolder(const std::string& folderPath) {
 // Interactive loop — type queries, get results
 // Loads vectors from disk, no re-indexing needed
 // ─────────────────────────────────────────
+
 void searchMode() {
     Embedder embedder;
     VectorStore store("vectors.db");
-
-    // Load existing index from disk
     store.loadFromDisk();
 
     if (store.size() == 0) {
-        std::cout << "No index found. Run: ./indexer index <folder_path>\n";
+        std::cout << "No index found. Run: ./indexer index <folder>\n";
         return;
     }
+
+    // Orchestrator coordinates all agents
+    Orchestrator orchestrator(store, embedder);
 
     std::cout << "\n🔍 Local Search Ready — " << store.size() << " chunks indexed\n";
     std::cout << "Type your query (or 'quit' to exit)\n\n";
 
-    // Interactive search loop
     while (true) {
         std::cout << "🔍 Search: ";
         std::string query;
         std::getline(std::cin, query);
 
-        // Exit condition
-        if (query == "quit" || query == "exit" || query == "q") {
-            std::cout << "Goodbye!\n";
-            break;
-        }
-
+        if (query == "quit" || query == "exit" || query == "q") break;
         if (query.empty()) continue;
 
-        // Convert query to vector
-        std::cout << "Searching...\n";
-        EmbeddingResult queryEmb = embedder.embed(query);
-
-        if (!queryEmb.success) {
-            std::cout << "Failed to embed query: " << queryEmb.error << "\n";
-            continue;
-        }
-
-        // Search vector store
-        auto results = store.search(queryEmb.embedding, 5);
+        // Single call to orchestrator — handles everything
+        auto results = orchestrator.search(query, 5);
 
         std::cout << "\n--- Results for: \"" << query << "\" ---\n\n";
 
         for (size_t i = 0; i < results.size(); i++) {
-            const auto& r = results[i];
-
-            // Convert similarity to percentage for readability
-            int scorePercent = static_cast<int>(r.similarity * 100);
-
+            int scorePercent = static_cast<int>(results[i].similarity * 100);
             std::cout << "#" << (i+1) << " [" << scorePercent << "% match]\n";
-            std::cout << "File: " << r.filePath << "\n";
-            std::cout << "Text: " << r.chunkText.substr(0, 200) << "...\n";
-            std::cout << "\n";
+            std::cout << "File: " << results[i].filePath << "\n";
+            std::cout << "Text: " << results[i].chunkText.substr(0, 200) << "...\n\n";
         }
         std::cout << "---\n\n";
     }
