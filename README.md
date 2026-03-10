@@ -92,6 +92,8 @@ src/
 
 ## How It Works
 
+## How It Works
+
 ### Indexing Sequence
 ```mermaid
 sequenceDiagram
@@ -100,6 +102,7 @@ sequenceDiagram
     participant ME as MetadataExtractor
     participant TC as TypeClassifier
     participant CE as ContentExtractor
+    participant IA as ImageAgent
     participant CH as Chunker
     participant EM as Embedder
     participant VS as VectorStore
@@ -114,7 +117,18 @@ sequenceDiagram
         M->>TC: classify(extension)
         TC-->>M: FileType + isLLMReadable
 
-        alt is LLM readable
+        alt is IMAGE
+            M->>IA: describe(filePath)
+            IA->>IA: imageToBase64(filePath)
+            IA->>IA: buildJSON(base64, prompt)
+            IA->>EM: POST /api/generate (LLaVA)
+            EM-->>IA: "A yellow sunflower in a garden..."
+            IA-->>M: ImageDescription {text}
+            M->>EM: embed(description)
+            EM-->>M: embedding[768]
+            M->>VS: addEntry(path, description, embedding)
+
+        else is DOCUMENT or CODE
             M->>CE: extract(filePath, extension)
             CE-->>M: {text, success}
 
@@ -123,7 +137,7 @@ sequenceDiagram
 
             loop For every chunk
                 M->>EM: embed(chunk.text)
-                EM-->>M: {embedding[768], success}
+                EM-->>M: embedding[768]
                 M->>VS: addEntry(path, text, embedding)
             end
         end
@@ -145,26 +159,64 @@ sequenceDiagram
     participant EM as Embedder
     participant VS as VectorStore
 
-    U->>M: "find resume with android"
+    U->>M: "find sunflower picture"
     M->>O: search(query)
 
     O->>QA: analyze(query)
-    QA-->>O: {type: DOCUMENT, keywords: [resume, android]}
+    QA->>QA: isCodeQuery? → NO
+    QA->>QA: isDocumentQuery? → NO
+    QA->>QA: extractKeywords → [sunflower, picture]
+    QA-->>O: {type: ANY, keywords: [sunflower, picture]}
 
     O->>SA: search(intent)
     SA->>EM: embed(query)
     EM-->>SA: queryVector[768]
 
     SA->>VS: search(queryVector, topK*3)
-    VS-->>SA: allResults (cosine similarity)
+    VS->>VS: cosineSimilarity(query, every stored vector)
+    VS->>VS: sort by similarity
+    VS->>VS: deduplicate by file
+    VS-->>SA: allResults
 
-    SA->>SA: filter by DOCUMENT type only
+    SA->>SA: filter by file type (ANY = no filter)
     SA-->>O: filteredResults
 
     O->>RA: rank(results, intent)
     RA->>RA: boost files with keywords in filename
+    RA->>RA: re-sort after boosting
     RA-->>O: rankedResults
 
     O-->>M: top 5 results
-    M-->>U: display results
+    M-->>U: #1 IMG_4521.jpg - "A yellow sunflower in a garden..."
+```
+
+### Image Indexing Deep Dive
+```mermaid
+sequenceDiagram
+    participant M as main.cpp
+    participant IA as ImageAgent
+    participant LV as LLaVA (Ollama)
+    participant EM as Embedder
+    participant VS as VectorStore
+
+    M->>IA: describe("photo.jpg")
+    IA->>IA: open file as binary bytes
+    IA->>IA: encode bytes → base64 string
+    Note over IA: FF D8 FF → "/9j/4AAQ..."
+
+    IA->>LV: POST /api/generate
+    Note over IA,LV: {model:llava, images:[base64], prompt:"describe..."}
+
+    LV->>LV: decode base64 → pixels
+    LV->>LV: vision model analyzes image
+    LV-->>IA: "A bright yellow sunflower with dark brown center..."
+
+    IA-->>M: ImageDescription {description, success}
+
+    M->>EM: embed(description)
+    Note over EM: same pipeline as text files
+    EM-->>M: [0.45, -0.23, 0.78, ...] 768 numbers
+
+    M->>VS: addEntry("photo.jpg", description, embedding)
+    VS-->>M: stored ✅
 ```
