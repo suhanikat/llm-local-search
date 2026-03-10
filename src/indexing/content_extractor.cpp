@@ -140,6 +140,14 @@ FileContent ContentExtractor::extractDOCX(const std::string& filePath) {
     // Clean up extra whitespace
     std::regex extraSpaces("\\s+");
     cleanText = std::regex_replace(cleanText, extraSpaces, " ");
+    
+        // Remove URL encoded strings like n=u001.TtzRjPf63...
+    std::regex urlEncoded("[a-zA-Z0-9+/=]{20,}");
+    cleanText = std::regex_replace(cleanText, urlEncoded, " ");
+
+    // Remove URL-like patterns
+    std::regex urlPattern("https?://\\S+|www\\.\\S+");
+    cleanText = std::regex_replace(cleanText, urlPattern, " "); 
 
     result.text = cleanText;
     result.success = true;
