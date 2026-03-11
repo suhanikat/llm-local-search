@@ -62,6 +62,14 @@ make
 🔍 Search: show me python code files
 🔍 Search: find documents about machine learning
 ```
+### Web UI
+```bash
+# Start the web interface
+./indexer serve
+
+# Open browser at
+http://localhost:8080
+```
 
 ## Project Structure
 ```
