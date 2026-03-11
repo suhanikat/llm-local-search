@@ -39,6 +39,8 @@ void SearchServer::start(int port) {
     std::cout << "Open your browser at: http://localhost:" << port << "\n";
     std::cout << "Press Ctrl+C to stop\n\n";
 
+    system("open http://localhost:8080");
+
     server.listen("0.0.0.0", port);
 }
 
