@@ -9,6 +9,8 @@
 #include "indexing/chunker.h"
 #include "agents/orchestrator.h"
 #include "agents/image_agent.h"
+#include "server/search_server.h"
+
 
 // ─────────────────────────────────────────
 // INDEX MODE
@@ -127,6 +129,20 @@ void searchMode() {
     }
 }
 
+void serveMode() {
+    Embedder embedder;
+    VectorStore store("vectors.db");
+    store.loadFromDisk();
+
+    if (store.size() == 0) {
+        std::cout << "No index found. Run: ./indexer index <folder>\n";
+        return;
+    }
+
+    SearchServer server(store, embedder);
+    server.start(8080);
+    
+}
 // ─────────────────────────────────────────
 // MAIN
 // Two modes:
@@ -147,6 +163,7 @@ int main(int argc, char* argv[]) {
         if (argc < 3) {
             std::cout << "Please provide a folder path\n";
             std::cout << "Usage: ./indexer index <folder_path>\n";
+            std::cout << "  ./indexer serve           — start web UI\n";
             return 1;
         }
         indexFolder(argv[2]);
@@ -154,9 +171,12 @@ int main(int argc, char* argv[]) {
     } else if (mode == "search") {
         searchMode();
 
-    } else {
+    }else if (mode == "serve") {
+        serveMode();
+    }  
+    else {
         std::cout << "Unknown mode: " << mode << "\n";
-        std::cout << "Use 'index' or 'search'\n";
+        std::cout << "Use 'index', 'search' or 'serve'\n";
     }
 
     return 0;

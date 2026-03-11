@@ -26,6 +26,7 @@ add_executable(indexer
     src/agents/ranking_agent.cpp
     src/agents/orchestrator.cpp
     src/agents/image_agent.cpp
+    src/server/search_server.cpp
 )
 
 target_include_directories(indexer PRIVATE
